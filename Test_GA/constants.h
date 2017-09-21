@@ -1,6 +1,6 @@
 const int VAR_NUMBER = 5;
 const double KNOWN_ANSWER = 0;
-const int POPULATION_SIZE = 1024*6 + 512; // should be a multiple of block size
+const int POPULATION_SIZE = 1024*5; // should be a multiple of block size
 const unsigned U_RAND_MAX = static_cast<unsigned>(RAND_MAX) + 1;
 
 // random number in [0, 1)
@@ -31,16 +31,19 @@ struct M_args
 	float *current_data;
 	//float *spike_TestData;
 	float dt;
-	int length;
+	//int length;
+	int spike_data_num;
+	int current_data_num;
 };
 //function HH_return for test
-float *HH_return(float *List_param, int VAR_NUMBER)
+float *HH_return(float *List_param, int VAR_NUMBER,int &num)
 {
-	float *Array_Data = new float[10000];
+	float *Array_Data = new float[10];
 	float *new_param = new float[5];
-	for (int i = 0; i < 10000; i++)
+	for (int i = 0; i < 10; i++)
 	{
 		Array_Data[i] = List_param[0];
 	}
+	num = 10;
 	return Array_Data;
 }

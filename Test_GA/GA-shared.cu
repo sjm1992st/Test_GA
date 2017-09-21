@@ -47,24 +47,33 @@ __global__ void randomInit(curandState* state, unsigned long seed) {
 
 __device__ float fitness(M_args deviceParameter, M_args_Tset deviceParameter_Tset,float tau) {
     float result = 0;
-	for (size_t i = 0; i<deviceParameter.length; ++i)
+	//printf("%d_a",deviceParameter.spike_data_num);
+	//printf("%d_b", deviceParameter_Tset.length);
+
+	for (size_t i = 0; i<deviceParameter.spike_data_num; ++i)
 		for (size_t j = 0; j<deviceParameter_Tset.length; ++j)
 	{
+			//printf("%f_c ", deviceParameter.spike_data[i]);
+			printf("%f_d ", deviceParameter_Tset.spike_TestData[j]);
 			result += expf(-fabsf(deviceParameter.spike_data[i] - deviceParameter_Tset.spike_TestData[j])*1.0/tau);
+			printf("%f_1 ", result);
        // ++curPos;
     }
-	for (size_t i = 0; i<deviceParameter.length; ++i)
-		for (size_t j = 0; j<deviceParameter.length; ++j)
+	for (size_t i = 0; i<deviceParameter.spike_data_num; ++i)
+		for (size_t j = 0; j<deviceParameter.spike_data_num; ++j)
 		{
 			result += expf(-fabsf(deviceParameter.spike_data[i] - deviceParameter.spike_data[j])*1.0 / tau);
+			printf("%f_2 ", result);
 			// ++curPos;
 		}
 	for (size_t i = 0; i<deviceParameter_Tset.length; ++i)
 		for (size_t j = 0; j<deviceParameter_Tset.length; ++j)
 		{
 			result -= 2*expf(-fabsf(deviceParameter_Tset.spike_TestData[i] - deviceParameter_Tset.spike_TestData[j])*1.0 / tau);
+			printf("%f_3 ", result);
 			// ++curPos;
 		}
+	printf("%f_4 ", result);
     return result;
 }
 
@@ -77,28 +86,28 @@ __device__ float rastrigin(const float *curPos) {
     return result;
 }
 
-__global__ void GAKernel(float* population, float** sharedPopulation, float* sharedScore, M_args deviceParameter, M_args_Tset *deviceParameter_Tset, float tau) {
-	//__shared__ float sharedPopulation[THREADS_PER_BLOCK * 2][VAR_NUMBER];
-	//__shared__ float sharedScore[THREADS_PER_BLOCK * 2];
-
-
-	const int gid = blockDim.x * blockIdx.x + threadIdx.x;
-	const int tid = threadIdx.x;
-
-	M_args_Tset curPos = deviceParameter_Tset[tid];
-	sharedScore[tid] = fitness(deviceParameter, curPos, tau);
-	// loading initial random population into shared memory
-	if (gid < POPULATION_SIZE) {
-		for (int i = 0; i < VAR_NUMBER; ++i)
-			sharedPopulation[tid][i] = population[gid * VAR_NUMBER + i];
-	}
-
-	sharedScore[tid + THREADS_PER_BLOCK] = 123123.0;
-
-	__syncthreads();
-	//return 
-}
-__global__ void GAKernel_gen(float* population, float** sharedPopulation, float* sharedScore, ScoreWithId* score, curandState* randomStates, M_args deviceParameter, M_args_Tset *deviceParameter_Tset, float tau) {
+////__global__ void GAKernel(float* population, float** sharedPopulation, float* sharedScore, M_args deviceParameter, M_args_Tset *deviceParameter_Tset, float tau) {
+////	//__shared__ float sharedPopulation[THREADS_PER_BLOCK * 2][VAR_NUMBER];
+////	//__shared__ float sharedScore[THREADS_PER_BLOCK * 2];
+////
+////
+////	const int gid = blockDim.x * blockIdx.x + threadIdx.x;
+////	const int tid = threadIdx.x;
+////
+////	M_args_Tset curPos = deviceParameter_Tset[tid];
+////	sharedScore[tid] = fitness(deviceParameter, curPos, tau);
+////	// loading initial random population into shared memory
+////	if (gid < POPULATION_SIZE) {
+////		for (int i = 0; i < VAR_NUMBER; ++i)
+////			sharedPopulation[tid][i] = population[gid * VAR_NUMBER + i];
+////	}
+////
+////	sharedScore[tid + THREADS_PER_BLOCK] = 123123.0;
+////
+////	__syncthreads();
+////	//return 
+////}
+__global__ void GAKernel_GenEach(float* population, ScoreWithId* score, curandState* randomStates, M_args deviceParameter, M_args_Tset *deviceParameter_Tset, float tau, int genindex, int MaxGeneration) {
 	// we first have to calculate the score for the first half of threads
 	//const float *curPos = sharedPopulation[tid];
 	__shared__ float sharedPopulation[THREADS_PER_BLOCK * 2][VAR_NUMBER];
@@ -115,7 +124,7 @@ __global__ void GAKernel_gen(float* population, float** sharedPopulation, float*
 			sharedPopulation[tid][i] = population[gid * VAR_NUMBER + i];
 	}
 
-	sharedScore[tid + THREADS_PER_BLOCK] = 123123.0;
+	//sharedScore[tid + THREADS_PER_BLOCK] = 123123.0;
 
 	__syncthreads();
 	curandState &localState = randomStates[tid];
@@ -175,6 +184,7 @@ __global__ void GAKernel_gen(float* population, float** sharedPopulation, float*
 			for (int i = 0; i < VAR_NUMBER; ++i)
 				sharedPopulation[tid][i] = population[ngid * VAR_NUMBER + i];
 			//sharedScore[tid] = fitness(sharedPopulation[tid], deviceParameter);
+			//sharedScore[tid]=fitness(deviceParameter, curPos_b, tau);
 		}
 	}
 
@@ -182,16 +192,14 @@ __global__ void GAKernel_gen(float* population, float** sharedPopulation, float*
 	if (gid < POPULATION_SIZE) {
 		for (int i = 0; i < VAR_NUMBER; ++i)
 			population[gid * VAR_NUMBER + i] = sharedPopulation[tid][i];
-
-		score[gid].score = sharedScore[tid];
+		if (genindex>=MaxGeneration)
+			score[gid].score = sharedScore[tid];
 	}
 }
 
-void printPopulation(const float* devicePopulation, const ScoreWithId* deviceScore, float **sharedPopulation, float *sharedScore) {
+void printPopulation(const float* devicePopulation, const ScoreWithId* deviceScore) {
 	float population[POPULATION_SIZE][VAR_NUMBER];
-	float share_population[POPULATION_SIZE][VAR_NUMBER];
 	cudasafe(cudaMemcpy(population, devicePopulation, POPULATION_SIZE * VAR_NUMBER * sizeof(float), cudaMemcpyDeviceToHost), "Could not copy population from device");
-	cudasafe(cudaMemcpy(population, sharedPopulation, POPULATION_SIZE * VAR_NUMBER * sizeof(float), cudaMemcpyDeviceToHost), "Could not copy population from device");
 
 	ScoreWithId score[POPULATION_SIZE];
 	cudasafe(cudaMemcpy(score, deviceScore, POPULATION_SIZE * sizeof (ScoreWithId), cudaMemcpyDeviceToHost), "Could not copy score to host");
@@ -216,16 +224,47 @@ void printPopulation(const float* devicePopulation, const ScoreWithId* deviceSco
 	}
 	std::cout << std::endl;
 }
+void printFinalPopulation(const float* devicePopulation, const ScoreWithId* deviceScore) {
+	float population[POPULATION_SIZE][VAR_NUMBER];
+	cudasafe(cudaMemcpy(population, devicePopulation, POPULATION_SIZE * VAR_NUMBER * sizeof(float), cudaMemcpyDeviceToHost), "Could not copy population from device");
 
+	ScoreWithId score[1];
+	cudasafe(cudaMemcpy(score, deviceScore, POPULATION_SIZE * sizeof (ScoreWithId), cudaMemcpyDeviceToHost), "Could not copy score to host");
+
+	//std::cout.cetf(std::ios::fixed);
+	std::cout.precision(12);
+
+	for (int i = 0; i<1; ++i) {
+		std::cout << std::setw(15) << i << ' ';
+	}
+	std::cout << std::endl;
+
+	for (int i = 0; i<VAR_NUMBER; i++) {
+		for (int u = 0; u<1; ++u) {
+			std::cout << std::setw(15) << population[u][i] << ' ';
+		}
+		std::cout << std::endl;
+	}
+	std::cout << "Score: " << std::endl;
+	for (int i = 0; i<1; ++i) {
+		std::cout << std::setw(15) << score[i].score << ' ';
+	}
+	std::cout << std::endl;
+}
 double solveGPU(M_args Parameter_) {
     cudasafe(cudaSetDevice(0), "Could not set device 0");
 
 	double ans = 0;
-	int MaxGeneration = 5;
-	float tau = 0.1;
+	int MaxGeneration = 1;
+	float tau = 12;
 	//M_args *IndexParameter_ = new M_args[MaxGeneration];
 	//IndexParameter_ = 0;
 	//IndexParameter_[0] = Parameter_;
+	///////////////////////////////
+
+
+
+	//////////////////////////////////
 	float *population = new float[POPULATION_SIZE * VAR_NUMBER];
 
 	for (int i=0; i<POPULATION_SIZE; ++i) {
@@ -234,8 +273,7 @@ double solveGPU(M_args Parameter_) {
 		}
 	}
 	M_args_Tset *Parameter_Tset=new M_args_Tset[POPULATION_SIZE];
-	for (int i = 0; i<POPULATION_SIZE; ++i)
-		Parameter_Tset[i].spike_TestData = HH_return(&population[i], VAR_NUMBER);
+
 	// copying population to device
 	float *devicePopulation = 0;
 	float *nextGeneration = 0;
@@ -243,28 +281,28 @@ double solveGPU(M_args Parameter_) {
 	ScoreWithId *deviceScore = 0;
 	curandState* randomStates;
 	M_args deviceParameter_;
-	int DataLength = getArrayLen(Parameter_.spike_data);
-	int DataLengthC = getArrayLen(Parameter_.current_data);
-	Parameter_.length = DataLength;
+	deviceParameter_.current_data_num = Parameter_.current_data_num;
+	deviceParameter_.spike_data_num = Parameter_.spike_data_num;
+	//int DataLength = getArrayLen(Parameter_.spike_data);
+
+
+	//int DataLengthC = getArrayLen(Parameter_.current_data);
+	//Parameter_.length = DataLength;
 
 	cudasafe(cudaMalloc(&randomStates, THREADS_PER_BLOCK * sizeof(curandState)), "Could not allocate memory for randomStates");
 	cudasafe(cudaMalloc((void **)&devicePopulation, POPULATION_SIZE * VAR_NUMBER * sizeof(float)), "Could not allocate memory for devicePopulation");
 	cudasafe(cudaMalloc((void **)&nextGeneration, POPULATION_SIZE * VAR_NUMBER * sizeof(float)), "Could not allocate memory for nextGeneration");
 	cudasafe(cudaMalloc((void **)&deviceScore, POPULATION_SIZE * sizeof (ScoreWithId)), "Could not allocate memory for deviceScore");
-	cudasafe(cudaMalloc((void **)&deviceParameter_Tset, POPULATION_SIZE * sizeof (M_args_Tset)), "Could not allocate memory for deviceParameter_Tset");
-	cudasafe(cudaMalloc((void **)&deviceParameter_.current_data, DataLengthC*sizeof(float)), "Could not allocate memory for deviceParameter_");
-	cudasafe(cudaMalloc((void **)&deviceParameter_.spike_data, DataLength*sizeof(float)), "Could not allocate memory for deviceParameter_");
-	cudasafe(cudaMalloc((void **)&deviceParameter_, sizeof(M_args_Tset)), "Could not allocate memory for deviceParameter_");
+	cudasafe(cudaMalloc((void **)&deviceParameter_Tset, 2*POPULATION_SIZE * sizeof (M_args_Tset)), "Could not allocate memory for deviceParameter_Tset");
+	cudasafe(cudaMalloc((void **)&deviceParameter_.current_data, Parameter_.current_data_num*sizeof(float)), "Could not allocate memory for deviceParameter_");
+	cudasafe(cudaMalloc((void **)&deviceParameter_.spike_data, Parameter_.spike_data_num*sizeof(float)), "Could not allocate memory for deviceParameter_");
+	//cudasafe(cudaMalloc((void **)&deviceParameter_, sizeof(M_args)), "Could not allocate memory for deviceParameter_");
 	//cudasafe(cudaMalloc((void **)&deviceParameter_.spike_TestData, DataLength*sizeof(float)), "Could not allocate memory for deviceParameter_");
 
 	cudasafe(cudaMemcpy(devicePopulation, population, POPULATION_SIZE * VAR_NUMBER * sizeof(float), cudaMemcpyHostToDevice), "Could not copy population to device");
-	cudasafe(cudaMemcpy(deviceParameter_.current_data, Parameter_.current_data, DataLengthC*sizeof(float), cudaMemcpyHostToDevice), "Could not copy Parameter_ to device");
-	cudasafe(cudaMemcpy(deviceParameter_.spike_data, Parameter_.spike_data, DataLength*sizeof(float), cudaMemcpyHostToDevice), "Could not copy Parameter_ to device");
-	for (int i = 0; i < POPULATION_SIZE; i++)
-	{
-		Parameter_Tset[i].length = getArrayLen(Parameter_Tset[i].spike_TestData);
-		cudasafe(cudaMemcpy(&deviceParameter_Tset[i], &Parameter_Tset[i], sizeof(Parameter_Tset[i]), cudaMemcpyHostToDevice), "Could not copy deviceParameter_Tset to device");
-	}
+	cudasafe(cudaMemcpy(deviceParameter_.current_data, Parameter_.current_data, Parameter_.current_data_num*sizeof(float), cudaMemcpyHostToDevice), "Could not copy Parameter_current_data to device");
+	cudasafe(cudaMemcpy(deviceParameter_.spike_data, Parameter_.spike_data, Parameter_.spike_data_num*sizeof(float), cudaMemcpyHostToDevice), "Could not copy Parameter_spike_data to device");
+
 	//cudasafe(cudaMemcpy(deviceParameter_.spike_TestData, Parameter_.spike_TestData, DataLength*sizeof(float), cudaMemcpyHostToDevice), "Could not copy Parameter_ to device");
 
 	// invoking random init
@@ -274,22 +312,37 @@ double solveGPU(M_args Parameter_) {
 
 	const int BLOCKS_NUMBER = (POPULATION_SIZE + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
-	float **sharedPopulation;
-	float *sharedScore=0;
-	cudasafe(cudaMalloc((void **)&sharedPopulation, THREADS_PER_BLOCK * 2 * sizeof(float*)), "Could not allocate memory for sharedPopulation");
-	cudasafe(cudaMalloc((void **)&sharedScore, THREADS_PER_BLOCK * 2 * sizeof(float)), "Could not allocate memory for sharedScore");
 
 	//__shared__ float sharedPopulation[THREADS_PER_BLOCK * 2][VAR_NUMBER];
 	//__shared__ float sharedScore[THREADS_PER_BLOCK * 2];
     //for (int i=0; i<1115; i++) {
-	GAKernel << <BLOCKS_NUMBER, THREADS_PER_BLOCK >> >(devicePopulation, sharedPopulation, sharedScore, deviceParameter_, deviceParameter_Tset, tau);
-	printPopulation(devicePopulation, deviceScore, sharedPopulation,sharedScore);
-	GAKernel_gen << <BLOCKS_NUMBER, THREADS_PER_BLOCK >> >(devicePopulation, sharedPopulation, sharedScore, deviceScore, randomStates, deviceParameter_, deviceParameter_Tset, tau);
+	//void GAKernel_GenEach(float* population, ScoreWithId* score, curandState* randomStates, M_args deviceParameter, M_args_Tset *deviceParameter_Tset, float tau)
+	for (int k = 0; k < MaxGeneration; k++) 
+	{
+		for (int j = 0; j < POPULATION_SIZE; ++j)
+		{
+
+			Parameter_Tset[j].spike_TestData = HH_return(&population[j], VAR_NUMBER, Parameter_Tset[j].length);
+
+			std::cout << Parameter_Tset[j].length << std::endl;
+			cudasafe(cudaMemcpy(&deviceParameter_Tset[j], &Parameter_Tset[j], sizeof (M_args_Tset), cudaMemcpyHostToDevice), "Could not copy deviceParameter_Tset to device");
+			cudasafe(cudaMemcpy(deviceParameter_Tset[j].spike_TestData, Parameter_Tset[j].spike_TestData, (Parameter_Tset[j].length*sizeof(float)), cudaMemcpyHostToDevice), "Could not copy deviceParameter_Tset_spike_TestData to device");
+
 	
+			
+		}
+		GAKernel_GenEach << <BLOCKS_NUMBER, THREADS_PER_BLOCK >> >(devicePopulation, deviceScore, randomStates, deviceParameter_, deviceParameter_Tset, tau, k, MaxGeneration);
+		//delete[]population;
+		//float *population = new float[POPULATION_SIZE * VAR_NUMBER];
+		cudasafe(cudaMemcpy(population, devicePopulation, POPULATION_SIZE * VAR_NUMBER * sizeof(float), cudaMemcpyDeviceToHost), "Could not copy population from device");
+
+		printFinalPopulation(devicePopulation, deviceScore);
+		////GAKernel_gen << <BLOCKS_NUMBER, THREADS_PER_BLOCK >> >(devicePopulation, sharedPopulation, sharedScore, deviceScore, randomStates, deviceParameter_, deviceParameter_Tset, tau);
+	}
 	cudasafe(cudaGetLastError(), "Could not invoke GAKernel");
     cudasafe(cudaDeviceSynchronize(), "Failed to syncrhonize device after calling GAKernel");
 
-    printPopulation(devicePopulation, deviceScore);
+    //printPopulation(devicePopulation, deviceScore);
     //}
 
 	// freeing memory
@@ -297,13 +350,13 @@ double solveGPU(M_args Parameter_) {
 	cudasafe(cudaFree(deviceScore), "Failed to free deviceScore");
 	cudasafe(cudaFree(randomStates), "Could not free randomStates");
 	cudasafe(cudaFree(nextGeneration), "Could not free nextGeneration");
-
+	cudasafe(cudaFree(deviceParameter_Tset), "Could not free deviceParameter_Tset");
 	delete[] population;
 
 	return ans;
 }
 
-float * Read_Txt(string filename)
+float * Read_Txt(string filename,int &num)
 {
 	float *Mdata = new float[100000];
 	ifstream in(filename);
@@ -313,7 +366,7 @@ float * Read_Txt(string filename)
 	{
 		while (getline(in, line)) // line中不包括每行的换行符  
 		{
-			cout << stringToNum<float>(line)+0.015 << endl;
+			//cout << stringToNum<float>(line)+0.015 << endl;
 			Mdata[i] = stringToNum<float>(line);
 			i++;
 		}
@@ -323,6 +376,7 @@ float * Read_Txt(string filename)
 		cout << "no such file" << endl;
 		return 0;
 	}
+	num = i;
 	float *Mdata_copy = new float[i];
 	for (int j = 0; j < i; j++)
 	{
@@ -337,8 +391,8 @@ int main() {
 	srand(static_cast<unsigned>(time(0)));
 	//float *spike_data, *current_data, *spike_TestData;
 	M_args Parameter_;
-	Parameter_.spike_data = Read_Txt("spikes.txt");
-	Parameter_.current_data = Read_Txt("current.txt");
+	Parameter_.spike_data = Read_Txt("spikes.txt", Parameter_.spike_data_num);
+	Parameter_.current_data = Read_Txt("current.txt", Parameter_.current_data_num);
 	//Parameter_.spike_TestData = Read_Txt("spikes_test.txt");
 	double ans = solveGPU(Parameter_);
 	std::cout << "GPU answer = " << ans << std::endl;
