@@ -54,26 +54,26 @@ __device__ float fitness(M_args deviceParameter, M_args_Tset deviceParameter_Tse
 		for (size_t j = 0; j<deviceParameter_Tset.length; ++j)
 	{
 			//printf("%f_c ", deviceParameter.spike_data[i]);
-			printf("%f_d ", deviceParameter_Tset.spike_TestData[j]);
+			//printf("%f_d ", deviceParameter_Tset.spike_TestData[j]);
 			result += expf(-fabsf(deviceParameter.spike_data[i] - deviceParameter_Tset.spike_TestData[j])*1.0/tau);
-			printf("%f_1 ", result);
+			//printf("%f_1 ", result);
        // ++curPos;
     }
 	for (size_t i = 0; i<deviceParameter.spike_data_num; ++i)
 		for (size_t j = 0; j<deviceParameter.spike_data_num; ++j)
 		{
 			result += expf(-fabsf(deviceParameter.spike_data[i] - deviceParameter.spike_data[j])*1.0 / tau);
-			printf("%f_2 ", result);
+			//printf("%f_2 ", result);
 			// ++curPos;
 		}
 	for (size_t i = 0; i<deviceParameter_Tset.length; ++i)
 		for (size_t j = 0; j<deviceParameter_Tset.length; ++j)
 		{
 			result -= 2*expf(-fabsf(deviceParameter_Tset.spike_TestData[i] - deviceParameter_Tset.spike_TestData[j])*1.0 / tau);
-			printf("%f_3 ", result);
+			//printf("%f_3 ", result);
 			// ++curPos;
 		}
-	printf("%f_4 ", result);
+	//printf("%f_4 ", result);
     return result;
 }
 
@@ -228,7 +228,7 @@ void printFinalPopulation(const float* devicePopulation, const ScoreWithId* devi
 	float population[POPULATION_SIZE][VAR_NUMBER];
 	cudasafe(cudaMemcpy(population, devicePopulation, POPULATION_SIZE * VAR_NUMBER * sizeof(float), cudaMemcpyDeviceToHost), "Could not copy population from device");
 
-	ScoreWithId score[1];
+	ScoreWithId score[POPULATION_SIZE];
 	cudasafe(cudaMemcpy(score, deviceScore, POPULATION_SIZE * sizeof (ScoreWithId), cudaMemcpyDeviceToHost), "Could not copy score to host");
 
 	//std::cout.cetf(std::ios::fixed);
@@ -321,13 +321,16 @@ double solveGPU(M_args Parameter_) {
 	{
 		for (int j = 0; j < POPULATION_SIZE; ++j)
 		{
-
+			float *temp_spike_TestData;
+			
 			Parameter_Tset[j].spike_TestData = HH_return(&population[j], VAR_NUMBER, Parameter_Tset[j].length);
-
+			cudaMalloc(&temp_spike_TestData, Parameter_Tset[j].length*sizeof(float));
 			std::cout << Parameter_Tset[j].length << std::endl;
-			cudasafe(cudaMemcpy(&deviceParameter_Tset[j], &Parameter_Tset[j], sizeof (M_args_Tset), cudaMemcpyHostToDevice), "Could not copy deviceParameter_Tset to device");
-			cudasafe(cudaMemcpy(deviceParameter_Tset[j].spike_TestData, Parameter_Tset[j].spike_TestData, (Parameter_Tset[j].length*sizeof(float)), cudaMemcpyHostToDevice), "Could not copy deviceParameter_Tset_spike_TestData to device");
+			cudasafe(cudaMemcpy(&deviceParameter_Tset[j], &Parameter_Tset[j], sizeof (M_args_Tset), cudaMemcpyHostToDevice), "Could not copy deviceParameter_Tset1 to device");
+			cudasafe(cudaMemcpy(temp_spike_TestData, Parameter_Tset[j].spike_TestData, (Parameter_Tset[j].length*sizeof(float)), cudaMemcpyHostToDevice), "Could not copy deviceParameter_Tset_spike_TestData2 to device");
 
+			cudasafe(cudaMemcpy(&deviceParameter_Tset[j].spike_TestData, &temp_spike_TestData, sizeof(float*), cudaMemcpyHostToDevice), "Could not copy deviceParameter_Tset_spike_TestData to device");
+			cudasafe(cudaFree(temp_spike_TestData), "Could not free temp_spike_TestData");
 	
 			
 		}
@@ -336,7 +339,9 @@ double solveGPU(M_args Parameter_) {
 		//float *population = new float[POPULATION_SIZE * VAR_NUMBER];
 		cudasafe(cudaMemcpy(population, devicePopulation, POPULATION_SIZE * VAR_NUMBER * sizeof(float), cudaMemcpyDeviceToHost), "Could not copy population from device");
 
+		printf("%d_1111\n", k);
 		printFinalPopulation(devicePopulation, deviceScore);
+		printf("%d_2222\n", k);
 		////GAKernel_gen << <BLOCKS_NUMBER, THREADS_PER_BLOCK >> >(devicePopulation, sharedPopulation, sharedScore, deviceScore, randomStates, deviceParameter_, deviceParameter_Tset, tau);
 	}
 	cudasafe(cudaGetLastError(), "Could not invoke GAKernel");

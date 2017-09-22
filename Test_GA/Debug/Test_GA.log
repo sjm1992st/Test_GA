@@ -1,10 +1,10 @@
-﻿生成启动时间为 2017/9/21 21:42:47。
+﻿生成启动时间为 2017/9/22 10:56:21。
      1>项目“F:\vsworkspace\Test_GA\Test_GA\Test_GA.vcxproj”在节点 2 上(Build 个目标)。
      1>AddCudaCompileDeps:
          D:\vs2013\VC\bin\cl.exe /E /nologo /showIncludes /TP /D__CUDACC__ /DWIN32 /D_DEBUG /D_CONSOLE /D_MBCS /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I. /FIcuda_runtime.h /c F:\vsworkspace\Test_GA\Test_GA\GA-shared.cu 
        CudaBuild:
          Compiling CUDA source file GA-shared.cu...
-         cmd.exe /C "C:\Users\user\AppData\Local\Temp\tmp5e3b6eeef540489e9ac790a040a8f893.cmd"
+         cmd.exe /C "C:\Users\user\AppData\Local\Temp\tmp79467adc66f048f485fd555871a4da04.cmd"
          "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2013 -ccbin "D:\vs2013\VC\bin"  -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include"  -G   --keep-dir Debug -maxrregcount=0  --machine 32 --compile -cudart static  -g   -DWIN32 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Zi /RTC1 /MDd " -o Debug\GA-shared.cu.obj "F:\vsworkspace\Test_GA\Test_GA\GA-shared.cu"
          
          F:\vsworkspace\Test_GA\Test_GA>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2013 -ccbin "D:\vs2013\VC\bin"  -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include"  -G   --keep-dir Debug -maxrregcount=0  --machine 32 --compile -cudart static  -g   -DWIN32 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Zi /RTC1 /MDd " -o Debug\GA-shared.cu.obj "F:\vsworkspace\Test_GA\Test_GA\GA-shared.cu" 
@@ -107,4 +107,4 @@
 
 生成成功。
 
-已用时间 00:00:11.57
+已用时间 00:00:11.95
